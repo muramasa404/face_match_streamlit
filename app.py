@@ -42,7 +42,7 @@ if uploaded_image is not None:
         confidence_score = prediction[0][index] * 100  # 100% 변환
 
         # 결과 이미지 경로
-        image_path = f"images/{class_name}.jpeg"  # 상대 경로로 수정
+        image_path = f"image/{class_name}.jpeg"  # 상대 경로로 수정
 
         # 예측된 클래스 이미지가 존재하는 경우만 출력
         if os.path.exists(image_path):
