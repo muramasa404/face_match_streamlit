@@ -1,76 +1,53 @@
-# 3.10 버전이하에서만 작동합니다.
-# conda create -n test2 python=3.10
-from keras.models import load_model
-from PIL import Image, ImageOps #Install pillow instead of PIL
-import numpy as np
 import streamlit as st
+import numpy as np
+from keras.models import load_model
+from PIL import Image, ImageOps
+import os
 
-# Disable scientific notation for clarity
-np.set_printoptions(suppress=True)
+# Streamlit 앱 제목
+st.title("👽 나와 닮은꼴 찾기")
+st.subheader("⭐️ 나는 박보검일까? 아님 그냥 🍔 밥버거일까?")
+# 모델 로드
+model = load_model("keras_Model.h5", compile=False)
 
-# Load the model
-model = load_model('keras_model.h5', compile=False)
+# 라벨 로드
+class_names = open("labels.txt", "r").readlines()
 
-# Load the labels
-class_names = open('labels.txt', 'r').readlines()
+# 사용자로부터 카메라 입력 받기
+uploaded_image = st.camera_input("📸 웹캠으로 사진을 찍어주세요!")
 
-# 선택 옵션: 카메라 입력 또는 파일 업로드
-input_method = st.radio("이미지 입력 방식 선택", ["카메라 사용", "파일 업로드"])
+if uploaded_image is not None:
+    # "결과 보기" 버튼 추가
+    if st.button("🔍 결과 보기"):
+        # 이미지 열기
+        image = Image.open(uploaded_image).convert("RGB")
 
-if input_method == "카메라 사용":
-    img_file_buffer = st.camera_input("정중앙에 사물을 위치하고 사진찍기 버튼을 누르세요")
-else:
-    img_file_buffer = st.file_uploader("이미지 파일 업로드", type=["png", "jpg", "jpeg"])
+        # 이미지 크기 조정 (224x224)
+        size = (224, 224)
+        image = ImageOps.fit(image, size, Image.Resampling.LANCZOS)
 
-# Create the array of the right shape to feed into the keras model
-# The 'length' or number of images you can put into the array is
-# determined by the first position in the shape tuple, in this case 1.
-# 들어온 이미지를 224 x 224 x 3차원으로 변환하기 위해서 빈 벡터를 만들어 놓음
-data = np.ndarray(shape=(1, 224, 224, 3), dtype=np.float32)
+        # numpy 배열로 변환 후 정규화
+        image_array = np.asarray(image)
+        normalized_image_array = (image_array.astype(np.float32) / 127.5) - 1
 
+        # 모델 입력 형태로 변환
+        data = np.ndarray(shape=(1, 224, 224, 3), dtype=np.float32)
+        data[0] = normalized_image_array
 
-if img_file_buffer is not None:
-    # # To read image file buffer as a PIL Image:
-    # image = Image.open(img_file_buffer) # 입력받은 사진을 행렬로 변환
+        # 모델 예측
+        prediction = model.predict(data)
+        index = np.argmax(prediction)
+        class_name = class_names[index].strip()
+        confidence_score = prediction[0][index] * 100  # 100% 변환
 
-    # # To convert PIL Image to numpy array:
-    # img_array = np.array(image) # ndarray로 변환
+        # 결과 이미지 경로
+        image_path = f"image/{class_name}.jpeg"
 
-    # Replace this with the path to your image
-    # 원본 이미지 불러오기
-    image = Image.open(img_file_buffer).convert('RGB')
-
-    #resize the image to a 224x224 with the same strategy as in TM2:
-    #resizing the image to be at least 224x224 and then cropping from the center
-    # 모델에 들어갈 수 있는 224 x 224 사이즈로 변환 
-    # 보간 방식 : Image.Resampling.LANCZOS 
-    size = (224, 224)
-    image = ImageOps.fit(image, size, Image.Resampling.LANCZOS)
-
-    #turn the image into a numpy array
-    # 이미지를 넘파이 행렬로 변환 
-    image_array = np.asarray(image)
-
-    # Normalize the image
-    # 모델이 학습했을 때 Nomalize 한 방식대로 이미지를 Nomalize 
-    normalized_image_array = (image_array.astype(np.float32) / 127.5) - 1
-
-    # Load the image into the array
-    # 빈 ARRAY에 전처리를 완료한 이미지를 복사
-    data[0] = normalized_image_array
-
-    # run the inference
-    # h5 모델에 예측 의뢰 
-    prediction = model.predict(data)
-    # 높은 신뢰도가 나온 인덱의 인덱스 자리를 저장
-    index = np.argmax(prediction)
-
-    # labels.txt 파일에서 가져온 값을 index로 호출
-    # 좋아하는 만화 선택하세요 - 만화 제목(text 리스트)랑 img 경로 리스트 일치 시킬 때 인덱스 활용한 것과 같은 방법
-    class_name = class_names[index]
-
-    # 예측 결과에서 신뢰도를 꺼내 옵니다  
-    confidence_score = prediction[0][index]
-
-    st.write('Class:', class_name[2:], end="")
-    st.write('Confidence score:', confidence_score)
+        # 예측된 클래스 이미지가 존재하는 경우만 출력
+        if os.path.exists(image_path):
+            st.subheader("👤 예측 결과")
+            st.write(f"**닮은꼴 연예인:** {class_name}")
+            st.write(f"**닮은꼴 매칭률:** {confidence_score:.2f}%")  # 퍼센트 표시
+            st.image(image_path, caption="🔍 나와 닮은꼴 연예인", use_container_width=True)
+        else:
+            st.error("⚠️ 해당 클래스에 대한 이미지가 없습니다!")
