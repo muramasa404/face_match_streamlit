@@ -17,12 +17,12 @@ if uploaded_model is not None:
     # 라벨 로드
     class_names = open("labels.txt", "r").readlines()
 
-    # 사용자로부터 카메라 입력 받기
+    # 사용자로부터 카메라 입력 받기 (웹캠으로 사진 찍기)
     uploaded_image = st.camera_input("📸 웹캠으로 사진을 찍어주세요!")
 
     if uploaded_image is not None:
-        # "결과 보기" 버튼 추가
-        if st.button("🔍 결과 보기"):
+        # "결과 확인" 버튼 추가
+        if st.button("🔍 결과 확인"):
             # 이미지 열기
             image = Image.open(uploaded_image).convert("RGB")
 
